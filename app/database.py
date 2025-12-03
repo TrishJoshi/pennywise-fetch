@@ -4,7 +4,7 @@ import os
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@localhost/pennywise")
 
-engine = create_engine(DATABASE_URL)
+engine = create_engine(DATABASE_URL, connect_args={"client_encoding": "utf8"})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def get_db():
