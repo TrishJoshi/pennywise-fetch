@@ -55,7 +55,7 @@ def distribute_income(request: DistributeIncomeRequest, db: Session = Depends(ge
         db.flush()
         categories.append(others_category)
 
-    total_needed = sum(c.monthly_amount for c in categories if c.name != "Others")
+    total_needed = sum((c.monthly_amount or Decimal(0)) for c in categories if c.name != "Others")
     
     if transaction.amount < total_needed:
         raise HTTPException(status_code=400, detail=f"Insufficient funds. Needed: {total_needed}, Available: {transaction.amount}")
