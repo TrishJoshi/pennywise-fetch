@@ -1,0 +1,47 @@
+{
+  "_format": "PennyWise Backup v1.0",
+  "_created": "2023-10-27T10:00:00.000Z",
+  "metadata": {
+    "export_id": "test-export-1",
+    "app_version": "2.15.20"
+  },
+  "database": {
+    "categories": [
+      {
+        "id": 1,
+        "name": "Food",
+        "color": "#FF5733",
+        "is_system": 0,
+        "is_income": 0
+      },
+      {
+        "id": 2,
+        "name": "Salary",
+        "color": "#33FF57",
+        "is_system": 0,
+        "is_income": 1
+      }
+    ],
+    "transactions": [
+      {
+        "id": 101,
+        "amount": "50.00",
+        "merchant_name": "Burger King",
+        "category": "Food",
+        "transaction_type": "EXPENSE",
+        "date_time": "2023-10-27T12:00:00.000Z",
+        "transaction_hash": "hash123",
+        "currency": "USD"
+      }
+    ],
+    "cards": [],
+    "account_balances": [],
+    "subscriptions": [],
+    "merchant_mappings": [],
+    "unrecognized_sms": [],
+    "chat_messages": [],
+    "transaction_rules": [],
+    "rule_applications": [],
+    "exchange_rates": []
+  }
+}
