@@ -1,10 +1,18 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
+from pydantic.alias_generators import to_camel
 from typing import List, Optional, Any, Dict
 from datetime import datetime
 
 # --- Entity Schemas ---
 
-class TransactionEntity(BaseModel):
+class CamelModel(BaseModel):
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+        from_attributes=True
+    )
+
+class TransactionEntity(CamelModel):
     id: Optional[int] = None
     amount: Optional[str] = None
     merchant_name: Optional[str] = None
@@ -26,7 +34,7 @@ class TransactionEntity(BaseModel):
     from_account: Optional[str] = None
     to_account: Optional[str] = None
 
-class CategoryEntity(BaseModel):
+class CategoryEntity(CamelModel):
     id: Optional[int] = None
     name: Optional[str] = None
     color: Optional[str] = None
@@ -36,7 +44,7 @@ class CategoryEntity(BaseModel):
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 
-class CardEntity(BaseModel):
+class CardEntity(CamelModel):
     id: Optional[int] = None
     card_last4: Optional[str] = None
     card_type: Optional[str] = None
@@ -51,7 +59,7 @@ class CardEntity(BaseModel):
     updated_at: Optional[str] = None
     currency: Optional[str] = None
 
-class AccountBalanceEntity(BaseModel):
+class AccountBalanceEntity(CamelModel):
     id: Optional[int] = None
     bank_name: Optional[str] = None
     account_last4: Optional[str] = None
@@ -65,7 +73,7 @@ class AccountBalanceEntity(BaseModel):
     created_at: Optional[str] = None
     currency: Optional[str] = None
 
-class SubscriptionEntity(BaseModel):
+class SubscriptionEntity(CamelModel):
     id: Optional[int] = None
     merchant_name: Optional[str] = None
     amount: Optional[str] = None
@@ -79,13 +87,13 @@ class SubscriptionEntity(BaseModel):
     updated_at: Optional[str] = None
     currency: Optional[str] = None
 
-class MerchantMappingEntity(BaseModel):
+class MerchantMappingEntity(CamelModel):
     merchant_name: Optional[str] = None
     category: Optional[str] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 
-class UnrecognizedSmsEntity(BaseModel):
+class UnrecognizedSmsEntity(CamelModel):
     id: Optional[int] = None
     sender: Optional[str] = None
     sms_body: Optional[str] = None
@@ -94,14 +102,14 @@ class UnrecognizedSmsEntity(BaseModel):
     is_deleted: Optional[int] = None
     created_at: Optional[str] = None
 
-class ChatMessageEntity(BaseModel):
+class ChatMessageEntity(CamelModel):
     id: Optional[str] = None
     message: Optional[str] = None
     isUser: Optional[int] = None
     timestamp: Optional[int] = None
     isSystemPrompt: Optional[int] = None
 
-class TransactionRuleEntity(BaseModel):
+class TransactionRuleEntity(CamelModel):
     id: Optional[str] = None
     name: Optional[str] = None
     description: Optional[str] = None
@@ -113,7 +121,7 @@ class TransactionRuleEntity(BaseModel):
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 
-class RuleApplicationEntity(BaseModel):
+class RuleApplicationEntity(CamelModel):
     id: Optional[str] = None
     rule_id: Optional[str] = None
     rule_name: Optional[str] = None
@@ -121,7 +129,7 @@ class RuleApplicationEntity(BaseModel):
     fields_modified: Optional[str] = None
     applied_at: Optional[str] = None
 
-class ExchangeRateEntity(BaseModel):
+class ExchangeRateEntity(CamelModel):
     id: Optional[int] = None
     from_currency: Optional[str] = None
     to_currency: Optional[str] = None
