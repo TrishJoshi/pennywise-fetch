@@ -163,6 +163,33 @@ def transfer_funds(transfer: FundTransfer, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/categories/{category_id}/reset")
+def reset_category(category_id: int, db: Session = Depends(get_db)):
+    category = db.query(Category).filter(Category.id == category_id).first()
+    if not category:
+        raise HTTPException(status_code=404, detail="Category not found")
+    
+    if (category.total_amount or 0) >= 0:
+        raise HTTPException(status_code=400, detail="Category balance is not negative")
+        
+    others = db.query(Category).filter(Category.name == "Others").first()
+    if not others:
+        raise HTTPException(status_code=500, detail="Others category not found")
+        
+    amount_needed = abs(category.total_amount)
+    
+    if (others.total_amount or 0) < amount_needed:
+        raise HTTPException(status_code=400, detail=f"Insufficient funds in Others. Needed: {amount_needed}, Available: {others.total_amount}")
+        
+    try:
+        others.total_amount -= amount_needed
+        category.total_amount += amount_needed
+        db.commit()
+        return {"message": "Category reset successfully", "transferred_amount": float(amount_needed)}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/distributions/{event_id}/revert")
 def revert_distribution(event_id: int, db: Session = Depends(get_db)):
     event = db.query(DistributionEvent).filter(DistributionEvent.id == event_id).first()

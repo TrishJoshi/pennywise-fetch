@@ -34,6 +34,13 @@ const api = {
         if (!res.ok) throw new Error((await res.json()).detail);
         return res.json();
     },
+    async resetCategory(id) {
+        const res = await fetch(`${API_BASE}/budget/categories/${id}/reset`, {
+            method: 'POST'
+        });
+        if (!res.ok) throw new Error((await res.json()).detail);
+        return res.json();
+    },
     async updateBudget(id, monthlyAmount) {
         const res = await fetch(`${API_BASE}/budget/categories/${id}`, {
             method: 'PUT',
@@ -101,6 +108,10 @@ const renderCategories = (categories) => {
     categories.forEach(cat => {
         const card = document.createElement('div');
         card.className = 'card category-card';
+
+        const totalAmount = parseFloat(cat.totalAmount || 0);
+        const isNegative = totalAmount < 0;
+
         card.innerHTML = `
             <div class="category-header">
                 <div>
@@ -115,11 +126,14 @@ const renderCategories = (categories) => {
                 </div>
                 <div class="amount-row">
                     <span class="amount-label">Total Available</span>
-                    <span class="amount-value" style="color: ${(cat.totalAmount || 0) < 0 ? 'var(--error-color)' : 'var(--success-color)'}">${formatCurrency(cat.totalAmount || 0)}</span>
+                    <span class="amount-value" style="color: ${isNegative ? 'var(--error-color)' : 'var(--success-color)'}">${formatCurrency(totalAmount)}</span>
                 </div>
             </div>
             <div class="actions">
                 <button class="secondary" onclick="editBudget(${cat.id}, ${cat.monthlyAmount || 0})">Edit Budget</button>
+                ${isNegative ? `
+                    <button class="secondary" style="background-color: var(--warning-color); color: black;" onclick="resetCategory(${cat.id})">Reset from Others</button>
+                ` : ''}
             </div>
         `;
         grid.appendChild(card);
@@ -223,6 +237,17 @@ window.revertDistribution = async (id) => {
     try {
         await api.revertDistribution(id);
         showNotification('Distribution reverted successfully');
+        loadData();
+    } catch (e) {
+        showNotification(e.message, true);
+    }
+};
+
+window.resetCategory = async (id) => {
+    if (!confirm('Reset this category? This will transfer funds from "Others" to make the balance 0.')) return;
+    try {
+        await api.resetCategory(id);
+        showNotification('Category reset successfully');
         loadData();
     } catch (e) {
         showNotification(e.message, true);
