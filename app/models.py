@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, Numeric, DateTime, ForeignKey, Text, JSON
+from sqlalchemy import Column, Integer, String, Boolean, Numeric, DateTime, ForeignKey, Text, JSON, BigInteger
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
@@ -115,7 +115,7 @@ class ChatMessage(Base):
     id = Column(String, primary_key=True) # UUID
     message = Column(String, nullable=False)
     isUser = Column(Boolean, default=False)
-    timestamp = Column(Integer, nullable=True) # Unix Epoch Millis
+    timestamp = Column(BigInteger, nullable=True) # Unix Epoch Millis
     isSystemPrompt = Column(Boolean, default=False)
 
 class TransactionRule(Base):
