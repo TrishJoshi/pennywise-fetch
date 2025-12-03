@@ -15,7 +15,7 @@ async def upload_backup(
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
-    if not file.filename.endswith('.json'):
+    if not file.filename.endswith('.pennywisebackup'):
         raise HTTPException(status_code=400, detail="Invalid file type. Please upload a JSON file.")
 
     try:
