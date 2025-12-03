@@ -23,6 +23,17 @@ const api = {
         const res = await fetch(`${API_BASE}/budget/income-transactions`);
         return res.json();
     },
+    async getDistributions() {
+        const res = await fetch(`${API_BASE}/budget/distributions`);
+        return res.json();
+    },
+    async revertDistribution(id) {
+        const res = await fetch(`${API_BASE}/budget/distributions/${id}/revert`, {
+            method: 'POST'
+        });
+        if (!res.ok) throw new Error((await res.json()).detail);
+        return res.json();
+    },
     async updateBudget(id, monthlyAmount) {
         const res = await fetch(`${API_BASE}/budget/categories/${id}`, {
             method: 'PUT',
@@ -143,12 +154,75 @@ const renderIncomeTransactions = (transactions) => {
     });
 };
 
+const renderDistributionHistory = (events) => {
+    const list = document.getElementById('distribution-history-list');
+    list.innerHTML = '';
+
+    if (events.length === 0) {
+        list.innerHTML = '<p style="color: var(--text-secondary);">No distribution history.</p>';
+        return;
+    }
+
+    events.forEach(event => {
+        const item = document.createElement('div');
+        item.className = 'transaction-item';
+        item.style.flexDirection = 'column';
+        item.style.alignItems = 'flex-start';
+
+        const header = document.createElement('div');
+        header.style.display = 'flex';
+        header.style.justifyContent = 'space-between';
+        header.style.width = '100%';
+        header.style.marginBottom = '8px';
+
+        header.innerHTML = `
+            <div class="transaction-info">
+                <span class="transaction-merchant">Distribution #${event.id}</span>
+                <span class="transaction-date">${new Date(event.timestamp).toLocaleString()}</span>
+            </div>
+            <div style="text-align: right;">
+                <span class="amount-value" style="color: var(--success-color)">${formatCurrency(event.totalAmount)}</span>
+                ${event.isReverted ?
+                '<span style="color: var(--error-color); font-size: 0.8rem; display: block;">Reverted</span>' :
+                `<button class="distribute-btn-small" style="background-color: var(--error-color); margin-top: 4px;" onclick="revertDistribution(${event.id})">Revert</button>`
+            }
+            </div>
+        `;
+
+        const details = document.createElement('div');
+        details.style.fontSize = '0.85rem';
+        details.style.color = 'var(--text-secondary)';
+        details.style.width = '100%';
+
+        const logDetails = event.logs.map(log =>
+            `${log.categoryName}: ${formatCurrency(log.amount)}`
+        ).join(', ');
+
+        details.textContent = logDetails;
+
+        item.appendChild(header);
+        item.appendChild(details);
+        list.appendChild(item);
+    });
+};
+
 // Event Handlers
 window.distributeIncome = async (id) => {
     if (!confirm('Distribute this income?')) return;
     try {
         const res = await api.distributeIncome(id);
         showNotification(`Distributed! Remainder: ${formatCurrency(res.remainder)}`);
+        loadData();
+    } catch (e) {
+        showNotification(e.message, true);
+    }
+};
+
+window.revertDistribution = async (id) => {
+    if (!confirm('Are you sure you want to revert this distribution? This will deduct the amounts from categories.')) return;
+    try {
+        await api.revertDistribution(id);
+        showNotification('Distribution reverted successfully');
         loadData();
     } catch (e) {
         showNotification(e.message, true);
@@ -209,12 +283,14 @@ document.getElementById('transfer-all').onchange = (e) => {
 // Init
 const loadData = async () => {
     try {
-        const [cats, txs] = await Promise.all([
+        const [cats, txs, dists] = await Promise.all([
             api.getCategories(),
-            api.getIncomeTransactions()
+            api.getIncomeTransactions(),
+            api.getDistributions()
         ]);
         renderCategories(cats);
         renderIncomeTransactions(txs);
+        renderDistributionHistory(dists);
     } catch (e) {
         console.error(e);
         showNotification('Failed to load data', true);

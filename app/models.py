@@ -207,3 +207,26 @@ class ImportRowLog(Base):
     transaction_rule = relationship("TransactionRule")
     rule_application = relationship("RuleApplication")
     exchange_rate = relationship("ExchangeRate")
+    
+class DistributionEvent(Base):
+    __tablename__ = "pennywise_distribution_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    transaction_id = Column(Integer, ForeignKey("pennywise_transactions.id"), nullable=False)
+    timestamp = Column(DateTime(timezone=True), default=datetime.utcnow)
+    total_amount = Column(Numeric(precision=20, scale=2), nullable=False)
+    is_reverted = Column(Boolean, default=False)
+    
+    transaction = relationship("Transaction")
+    logs = relationship("DistributionLog", back_populates="event")
+
+class DistributionLog(Base):
+    __tablename__ = "pennywise_distribution_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    event_id = Column(Integer, ForeignKey("pennywise_distribution_events.id"), nullable=False)
+    category_id = Column(Integer, ForeignKey("pennywise_categories.id"), nullable=False)
+    amount = Column(Numeric(precision=20, scale=2), nullable=False)
+    
+    event = relationship("DistributionEvent", back_populates="logs")
+    category = relationship("Category")

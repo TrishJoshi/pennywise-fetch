@@ -57,10 +57,23 @@ class CardEntity(CamelModel):
     is_active: Optional[int] = None
     last_balance: Optional[str] = None
     last_balance_source: Optional[str] = None
-    last_balance_date: Optional[str] = None
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+    last_balance_date: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
     currency: Optional[str] = None
+
+class DistributionLogEntity(CamelModel):
+    id: int
+    category_name: str
+    amount: Decimal
+
+class DistributionEventEntity(CamelModel):
+    id: int
+    transaction_id: int
+    timestamp: datetime
+    total_amount: Decimal
+    is_reverted: bool
+    logs: List[DistributionLogEntity] = []
 
 class AccountBalanceEntity(CamelModel):
     id: Optional[int] = None
