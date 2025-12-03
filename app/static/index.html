@@ -18,21 +18,20 @@
         <header>
             <h1>PennyWise Budget</h1>
             <div id="total-balance-card" class="total-balance-card">
-                <span class="total-label">Total Balance</span>
-                <span id="total-balance-amount" class="total-amount">₹0.00</span>
+                <div class="header-upload-section">
+                    <form id="upload-form" class="header-upload-form">
+                        <input type="file" id="backup-file" accept=".json" required class="header-file-input">
+                        <button type="submit" class="header-upload-btn">Upload Backup</button>
+                    </form>
+                </div>
+                <div class="header-balance-section">
+                    <span class="total-label">Total Balance</span>
+                    <span id="total-balance-amount" class="total-amount">₹0.00</span>
+                </div>
             </div>
         </header>
 
         <div class="grid">
-            <!-- Upload Section -->
-            <div class="card">
-                <h2>Upload Backup</h2>
-                <form id="upload-form">
-                    <input type="file" id="backup-file" accept=".pennywisebackup" required>
-                    <button type="submit" style="margin-top: 10px; width: 100%">Upload & Sync</button>
-                </form>
-            </div>
-
             <!-- Income Distribution -->
             <div class="card">
                 <h2>Distribute Income</h2>

@@ -49,6 +49,48 @@ h1 {
     padding: 15px 25px;
     border-radius: 12px;
     border: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-width: 400px;
+}
+
+.header-upload-section {
+    display: flex;
+    align-items: center;
+}
+
+.header-upload-form {
+    display: flex;
+    gap: 10px;
+}
+
+.header-file-input {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 8px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    max-width: 200px;
+}
+
+.header-upload-btn {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background-color 0.2s;
+}
+
+.header-upload-btn:hover {
+    background-color: #357abd;
+}
+
+.header-balance-section {
     text-align: right;
 }
 
