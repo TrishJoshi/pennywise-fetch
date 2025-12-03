@@ -113,6 +113,10 @@ const renderCategories = (categories) => {
         `;
         grid.appendChild(card);
     });
+
+    // Update Total Balance
+    const totalBalance = categories.reduce((sum, cat) => sum + parseFloat(cat.totalAmount || 0), 0);
+    document.getElementById('total-balance-amount').textContent = formatCurrency(totalBalance);
 };
 
 const renderIncomeTransactions = (transactions) => {

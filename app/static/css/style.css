@@ -44,6 +44,28 @@ h1 {
     -webkit-text-fill-color: transparent;
 }
 
+.total-balance-card {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 15px 25px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    text-align: right;
+}
+
+.total-label {
+    display: block;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 5px;
+}
+
+.total-amount {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--success-color);
+    font-family: 'Roboto Mono', monospace;
+}
+
 .card {
     background-color: var(--card-bg);
     border-radius: 12px;
