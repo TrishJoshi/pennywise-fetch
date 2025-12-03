@@ -65,8 +65,9 @@ def distribute_income(request: DistributeIncomeRequest, db: Session = Depends(ge
         sum_allocated = Decimal(0)
         for category in categories:
             if category.name != "Others":
-                category.total_amount = (category.total_amount or 0) + category.monthly_amount
-                sum_allocated += category.monthly_amount
+                monthly_amt = category.monthly_amount or Decimal(0)
+                category.total_amount = (category.total_amount or 0) + monthly_amt
+                sum_allocated += monthly_amt
         
         remainder = transaction.amount - sum_allocated
         others_category.total_amount = (others_category.total_amount or 0) + remainder
