@@ -136,7 +136,7 @@ def process_entity_group(db: Session, import_log: ImportLog, model, data_list, u
             t_category_name = item_data.get('category')
             t_type = item_data.get('transaction_type')
             
-            if t_amount and t_category_name and t_type == 'EXPENSE':
+            if t_amount and t_category_name and t_type in ['EXPENSE', 'INCOME']:
                 cat = db.query(Category).filter(Category.name == t_category_name).first()
                 if cat:
                     # If UPDATED, we need to revert old amount from old category if changed
@@ -158,7 +158,11 @@ def process_entity_group(db: Session, import_log: ImportLog, model, data_list, u
                         pass
 
                     if action == "ADDED":
-                        cat.total_amount = (cat.total_amount or 0) - Decimal(t_amount)
+                        if t_type == 'EXPENSE':
+                            cat.total_amount = (cat.total_amount or 0) - Decimal(t_amount)
+                        elif t_type == 'INCOME':
+                            cat.total_amount = (cat.total_amount or 0) + Decimal(t_amount)
+                        
                         db.add(cat) # Mark as modified
 
 
