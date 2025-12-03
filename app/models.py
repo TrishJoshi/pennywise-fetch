@@ -45,9 +45,9 @@ class Card(Base):
     __tablename__ = "pennywise_cards"
 
     id = Column(Integer, primary_key=True, index=True)
-    card_last4 = Column(String, nullable=False)
+    card_last4 = Column(String, nullable=True)
     card_type = Column(String, nullable=True) # Enum
-    bank_name = Column(String, nullable=False)
+    bank_name = Column(String, nullable=True)
     account_last4 = Column(String, nullable=True)
     nickname = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
