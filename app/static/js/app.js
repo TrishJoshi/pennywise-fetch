@@ -19,6 +19,10 @@ const api = {
         const res = await fetch(`${API_BASE}/budget/categories`);
         return res.json();
     },
+    async getIncomeTransactions() {
+        const res = await fetch(`${API_BASE}/budget/income-transactions`);
+        return res.json();
+    },
     async updateBudget(id, monthlyAmount) {
         const res = await fetch(`${API_BASE}/budget/categories/${id}`, {
             method: 'PUT',
@@ -111,7 +115,42 @@ const renderCategories = (categories) => {
     });
 };
 
+const renderIncomeTransactions = (transactions) => {
+    const list = document.getElementById('income-transactions-list');
+    list.innerHTML = '';
+
+    if (transactions.length === 0) {
+        list.innerHTML = '<p style="color: var(--text-secondary);">No recent income transactions found.</p>';
+        return;
+    }
+
+    transactions.forEach(tx => {
+        const item = document.createElement('div');
+        item.className = 'transaction-item';
+        item.innerHTML = `
+            <div class="transaction-info">
+                <span class="transaction-merchant">${tx.merchantName || tx.merchant_name || 'Unknown'}</span>
+                <span class="transaction-date">${new Date(tx.dateTime || tx.date_time).toLocaleDateString()}</span>
+                <span class="amount-value" style="color: var(--success-color)">${formatCurrency(tx.amount)}</span>
+            </div>
+            <button class="distribute-btn-small" onclick="distributeIncome(${tx.id})">Distribute</button>
+        `;
+        list.appendChild(item);
+    });
+};
+
 // Event Handlers
+window.distributeIncome = async (id) => {
+    if (!confirm('Distribute this income?')) return;
+    try {
+        const res = await api.distributeIncome(id);
+        showNotification(`Distributed! Remainder: ${formatCurrency(res.remainder)}`);
+        loadData();
+    } catch (e) {
+        showNotification(e.message, true);
+    }
+};
+
 window.editBudget = async (id, current) => {
     const newAmount = prompt("Enter new monthly amount:", current);
     if (newAmount !== null && !isNaN(newAmount)) {
@@ -122,19 +161,6 @@ window.editBudget = async (id, current) => {
         } catch (e) {
             showNotification(e.message, true);
         }
-    }
-};
-
-document.getElementById('distribute-btn').onclick = async () => {
-    const id = document.getElementById('transaction-id').value;
-    if (!id) return showNotification('Enter Transaction ID', true);
-
-    try {
-        const res = await api.distributeIncome(id);
-        showNotification(`Distributed! Remainder: ${formatCurrency(res.remainder)}`);
-        loadData();
-    } catch (e) {
-        showNotification(e.message, true);
     }
 };
 
@@ -179,11 +205,15 @@ document.getElementById('transfer-all').onchange = (e) => {
 // Init
 const loadData = async () => {
     try {
-        const cats = await api.getCategories();
+        const [cats, txs] = await Promise.all([
+            api.getCategories(),
+            api.getIncomeTransactions()
+        ]);
         renderCategories(cats);
+        renderIncomeTransactions(txs);
     } catch (e) {
         console.error(e);
-        showNotification('Failed to load categories', true);
+        showNotification('Failed to load data', true);
     }
 };
 

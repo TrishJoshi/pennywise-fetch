@@ -2,9 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Category, Transaction
-from app.schemas import CategoryEntity, BudgetUpdate, FundTransfer, DistributeIncomeRequest
+from app.schemas import CategoryEntity, BudgetUpdate, FundTransfer, DistributeIncomeRequest, TransactionEntity
 from decimal import Decimal
 from typing import List
+from sqlalchemy import desc
 
 router = APIRouter(
     prefix="/budget",
@@ -15,6 +16,14 @@ router = APIRouter(
 @router.get("/categories", response_model=List[CategoryEntity])
 def get_categories(db: Session = Depends(get_db)):
     return db.query(Category).order_by(Category.display_order).all()
+
+@router.get("/income-transactions", response_model=List[TransactionEntity])
+def get_income_transactions(db: Session = Depends(get_db)):
+    # Fetch recent income transactions (limit 20 for now)
+    return db.query(Transaction).filter(
+        Transaction.category == "Income",
+        Transaction.transaction_type == "INCOME"
+    ).order_by(desc(Transaction.date_time)).limit(20).all()
 
 @router.put("/categories/{category_id}", response_model=CategoryEntity)
 def update_category_budget(category_id: int, budget: BudgetUpdate, db: Session = Depends(get_db)):

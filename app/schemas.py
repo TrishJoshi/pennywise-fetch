@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from pydantic.alias_generators import to_camel
 from typing import List, Optional, Any, Dict
 from datetime import datetime
+from decimal import Decimal
 
 # --- Entity Schemas ---
 
@@ -14,22 +15,22 @@ class CamelModel(BaseModel):
 
 class TransactionEntity(CamelModel):
     id: Optional[int] = None
-    amount: Optional[str] = None
+    amount: Optional[Decimal] = None
     merchant_name: Optional[str] = None
     category: Optional[str] = None
     transaction_type: Optional[str] = None
-    date_time: Optional[str] = None
+    date_time: Optional[datetime] = None
     description: Optional[str] = None
     sms_body: Optional[str] = None
     bank_name: Optional[str] = None
     sms_sender: Optional[str] = None
     account_number: Optional[str] = None
-    balance_after: Optional[str] = None
+    balance_after: Optional[Decimal] = None
     transaction_hash: Optional[str] = None
     is_recurring: Optional[int] = None # 0 or 1
     is_deleted: Optional[int] = None # 0 or 1
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
     currency: Optional[str] = None
     from_account: Optional[str] = None
     to_account: Optional[str] = None
@@ -41,10 +42,10 @@ class CategoryEntity(CamelModel):
     is_system: Optional[int] = None
     is_income: Optional[int] = None
     display_order: Optional[int] = None
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
-    monthly_amount: Optional[str] = None
-    total_amount: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    monthly_amount: Optional[Decimal] = None
+    total_amount: Optional[Decimal] = None
 
 class CardEntity(CamelModel):
     id: Optional[int] = None

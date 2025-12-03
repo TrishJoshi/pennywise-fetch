@@ -5,6 +5,7 @@ from app.database import get_db, engine
 from app.models import Category, Transaction, Base
 from decimal import Decimal
 from sqlalchemy.orm import sessionmaker
+from datetime import datetime
 
 # Setup test DB
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -129,3 +130,29 @@ def test_insufficient_funds_message(test_db):
     assert "Insufficient funds" in response.json()["detail"]
     assert "Needed: 7000.00" in response.json()["detail"]
     assert "Available: 500.00" in response.json()["detail"]
+
+def test_get_income_transactions(test_db):
+    # Create an income transaction
+    tx = Transaction(
+        amount=5000,
+        merchant_name="Bonus",
+        category="Income",
+        transaction_type="INCOME",
+        transaction_hash="tx_bonus",
+        date_time=datetime.utcnow()
+    )
+    test_db.add(tx)
+    test_db.commit()
+    
+    response = client.get("/api/v1/budget/income-transactions")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) >= 1
+    merchants = [t["merchantName"] for t in data]
+    assert "Bonus" in merchants
+
+def test_get_categories_no_500(test_db):
+    response = client.get("/api/v1/budget/categories")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, list)

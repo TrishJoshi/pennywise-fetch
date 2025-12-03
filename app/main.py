@@ -20,7 +20,13 @@ app.include_router(budget_router, prefix="/api/v1")
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 if not os.path.exists(static_dir):
     os.makedirs(static_dir)
+
 app.mount("/static", StaticFiles(directory=static_dir, html=True), name="static")
+
+@app.get("/")
+async def read_root():
+    from fastapi.responses import FileResponse
+    return FileResponse(os.path.join(static_dir, "index.html"))
 
 @app.get("/health")
 def health_check():
