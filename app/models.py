@@ -13,7 +13,7 @@ class Transaction(Base):
     merchant_name = Column(String, nullable=False)
     category = Column(String, nullable=False)
     transaction_type = Column(String, nullable=True) # Enum
-    date_time = Column(DateTime, nullable=True)
+    date_time = Column(DateTime(timezone=True), nullable=True)
     description = Column(String, nullable=True)
     sms_body = Column(String, nullable=True)
     bank_name = Column(String, nullable=True)
@@ -23,8 +23,8 @@ class Transaction(Base):
     transaction_hash = Column(String, unique=True, index=True)
     is_recurring = Column(Boolean, default=False)
     is_deleted = Column(Boolean, default=False)
-    created_at = Column(DateTime, nullable=True)
-    updated_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=True)
+    updated_at = Column(DateTime(timezone=True), nullable=True)
     currency = Column(String, default="INR")
     from_account = Column(String, nullable=True)
     to_account = Column(String, nullable=True)
@@ -38,8 +38,8 @@ class Category(Base):
     is_system = Column(Boolean, default=False)
     is_income = Column(Boolean, default=False)
     display_order = Column(Integer, default=999)
-    created_at = Column(DateTime, nullable=True)
-    updated_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=True)
+    updated_at = Column(DateTime(timezone=True), nullable=True)
 
 class Card(Base):
     __tablename__ = "pennywise_cards"
@@ -53,9 +53,9 @@ class Card(Base):
     is_active = Column(Boolean, default=True)
     last_balance = Column(Numeric(precision=20, scale=2), nullable=True)
     last_balance_source = Column(String, nullable=True)
-    last_balance_date = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, nullable=True)
-    updated_at = Column(DateTime, nullable=True)
+    last_balance_date = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=True)
+    updated_at = Column(DateTime(timezone=True), nullable=True)
     currency = Column(String, default="INR")
 
 class AccountBalance(Base):
@@ -65,13 +65,13 @@ class AccountBalance(Base):
     bank_name = Column(String, nullable=False)
     account_last4 = Column(String, nullable=False)
     balance = Column(Numeric(precision=20, scale=2), nullable=True)
-    timestamp = Column(DateTime, nullable=False)
+    timestamp = Column(DateTime(timezone=True), nullable=False)
     transaction_id = Column(Integer, nullable=True)
     credit_limit = Column(Numeric(precision=20, scale=2), nullable=True)
     is_credit_card = Column(Boolean, default=False)
     sms_source = Column(String, nullable=True)
     source_type = Column(String, nullable=True)
-    created_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=True)
     currency = Column(String, default="INR")
 
 class Subscription(Base):
@@ -80,14 +80,14 @@ class Subscription(Base):
     id = Column(Integer, primary_key=True, index=True)
     merchant_name = Column(String, nullable=False)
     amount = Column(Numeric(precision=20, scale=2), nullable=True)
-    next_payment_date = Column(DateTime, nullable=True)
+    next_payment_date = Column(DateTime(timezone=True), nullable=True)
     state = Column(String, nullable=True) # Enum
     bank_name = Column(String, nullable=True)
     umn = Column(String, nullable=True)
     category = Column(String, nullable=True)
     sms_body = Column(String, nullable=True)
-    created_at = Column(DateTime, nullable=True)
-    updated_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=True)
+    updated_at = Column(DateTime(timezone=True), nullable=True)
     currency = Column(String, default="INR")
 
 class MerchantMapping(Base):
@@ -95,8 +95,8 @@ class MerchantMapping(Base):
 
     merchant_name = Column(String, primary_key=True)
     category = Column(String, nullable=False)
-    created_at = Column(DateTime, nullable=True)
-    updated_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=True)
+    updated_at = Column(DateTime(timezone=True), nullable=True)
 
 class UnrecognizedSms(Base):
     __tablename__ = "pennywise_unrecognized_sms"
@@ -104,10 +104,10 @@ class UnrecognizedSms(Base):
     id = Column(Integer, primary_key=True, index=True)
     sender = Column(String, nullable=False)
     sms_body = Column(String, nullable=False)
-    received_at = Column(DateTime, nullable=True)
+    received_at = Column(DateTime(timezone=True), nullable=True)
     reported = Column(Boolean, default=False)
     is_deleted = Column(Boolean, default=False)
-    created_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=True)
 
 class ChatMessage(Base):
     __tablename__ = "pennywise_chat_messages"
@@ -117,6 +117,7 @@ class ChatMessage(Base):
     isUser = Column(Boolean, default=False)
     timestamp = Column(BigInteger, nullable=True) # Unix Epoch Millis
     isSystemPrompt = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), nullable=True)
 
 class TransactionRule(Base):
     __tablename__ = "pennywise_transaction_rules"
@@ -129,8 +130,8 @@ class TransactionRule(Base):
     actions = Column(Text, nullable=True) # JSON String
     is_active = Column(Boolean, default=True)
     is_system_template = Column(Boolean, default=False)
-    created_at = Column(DateTime, nullable=True)
-    updated_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=True)
+    updated_at = Column(DateTime(timezone=True), nullable=True)
 
 class RuleApplication(Base):
     __tablename__ = "pennywise_rule_applications"
@@ -140,7 +141,7 @@ class RuleApplication(Base):
     rule_name = Column(String, nullable=False)
     transaction_id = Column(String, nullable=False) # Note: Source schema says transaction_id is TEXT here, but transactions.id is INTEGER. Assuming it refers to transactions.id but stored as text or maybe transaction_hash? The schema report says "transaction_id -> transactions(id)". I will keep it as String to match source schema definition "TEXT" but it might be an Integer cast to string.
     fields_modified = Column(Text, nullable=True) # JSON String
-    applied_at = Column(DateTime, nullable=True)
+    applied_at = Column(DateTime(timezone=True), nullable=True)
 
 class ExchangeRate(Base):
     __tablename__ = "pennywise_exchange_rates"
@@ -150,9 +151,9 @@ class ExchangeRate(Base):
     to_currency = Column(String, nullable=False)
     rate = Column(Numeric(precision=20, scale=6), nullable=True)
     provider = Column(String, nullable=False)
-    updated_at = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime(timezone=True), nullable=True)
     updated_at_unix = Column(Integer, default=0)
-    expires_at = Column(DateTime, nullable=True)
+    expires_at = Column(DateTime(timezone=True), nullable=True)
     expires_at_unix = Column(Integer, default=0)
 
 # --- Import History Models ---
@@ -163,8 +164,8 @@ class ImportLog(Base):
     id = Column(Integer, primary_key=True, index=True)
     filename = Column(String, nullable=False)
     status = Column(String, nullable=False) # STARTED, COMPLETED, FAILED
-    started_at = Column(DateTime, default=datetime.utcnow)
-    completed_at = Column(DateTime, nullable=True)
+    started_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
     error_message = Column(Text, nullable=True)
     
     row_logs = relationship("ImportRowLog", back_populates="log")
