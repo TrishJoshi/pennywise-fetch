@@ -40,6 +40,8 @@ class Category(Base):
     display_order = Column(Integer, default=999)
     created_at = Column(DateTime(timezone=True), nullable=True)
     updated_at = Column(DateTime(timezone=True), nullable=True)
+    monthly_amount = Column(Numeric(precision=20, scale=2), default=0)
+    total_amount = Column(Numeric(precision=20, scale=2), default=0)
 
 class Card(Base):
     __tablename__ = "pennywise_cards"

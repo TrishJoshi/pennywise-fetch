@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PennyWise Budget Manager</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>PennyWise Budget</h1>
+        </header>
+
+        <div class="grid">
+            <!-- Upload Section -->
+            <div class="card">
+                <h2>Upload Backup</h2>
+                <form id="upload-form">
+                    <input type="file" id="backup-file" accept=".pennywisebackup" required>
+                    <button type="submit" style="margin-top: 10px; width: 100%">Upload & Sync</button>
+                </form>
+            </div>
+
+            <!-- Income Distribution -->
+            <div class="card">
+                <h2>Distribute Income</h2>
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 15px;">
+                    Enter the Transaction ID of an income transaction to distribute funds according to monthly budgets.
+                </p>
+                <input type="number" id="transaction-id" placeholder="Transaction ID">
+                <button id="distribute-btn" style="margin-top: 10px; width: 100%">Distribute Income</button>
+            </div>
+
+            <!-- Fund Transfer -->
+            <div class="card">
+                <h2>Transfer Funds</h2>
+                <form id="transfer-form">
+                    <select id="transfer-from" required>
+                        <option value="">Select Source</option>
+                    </select>
+                    <select id="transfer-to" required>
+                        <option value="">Select Target</option>
+                    </select>
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                        <input type="checkbox" id="transfer-all">
+                        <label for="transfer-all">Transfer All Remaining</label>
+                    </div>
+                    <input type="number" id="transfer-amount" placeholder="Amount" step="0.01">
+                    <button type="submit" style="width: 100%">Transfer Funds</button>
+                </form>
+            </div>
+        </div>
+
+        <h2 style="margin-top: 40px; margin-bottom: 20px;">Category Budgets</h2>
+        <div id="categories-grid" class="grid">
+            <!-- Categories will be loaded here -->
+        </div>
+    </div>
+
+    <div id="notification"></div>
+    <script src="js/app.js"></script>
+</body>
+</html>

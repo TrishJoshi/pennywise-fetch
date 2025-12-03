@@ -43,6 +43,8 @@ class CategoryEntity(CamelModel):
     display_order: Optional[int] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
+    monthly_amount: Optional[str] = None
+    total_amount: Optional[str] = None
 
 class CardEntity(CamelModel):
     id: Optional[int] = None
@@ -139,6 +141,18 @@ class ExchangeRateEntity(CamelModel):
     updated_at_unix: Optional[int] = None
     expires_at: Optional[str] = None
     expires_at_unix: Optional[int] = None
+
+class BudgetUpdate(BaseModel):
+    monthly_amount: str
+
+class FundTransfer(BaseModel):
+    from_category_id: int
+    to_category_id: int
+    amount: Optional[str] = None
+    transfer_all: bool = False
+
+class DistributeIncomeRequest(BaseModel):
+    transaction_id: int
 
 # --- Snapshot Schemas ---
 
