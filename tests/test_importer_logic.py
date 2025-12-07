@@ -3,7 +3,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from decimal import Decimal
 from datetime import datetime
-from app.models import Base, Category, Transaction
+from app.models import Base, Category, Transaction, Bucket, ImportLog, ImportRowLog
 from app.services.importer import process_backup
 from app.schemas import PennyWiseBackup, DatabaseSnapshot, TransactionEntity, CategoryEntity
 
@@ -20,13 +20,17 @@ def test_db():
     db.close()
     Base.metadata.drop_all(bind=engine)
 
-def test_importer_income_expense_logic(test_db):
-    # 1. Setup Initial Data (Category)
-    # We can rely on the importer to create the category if it's in the backup, 
-    # but let's pre-create it to verify updates or just let importer handle it.
-    # Let's let importer create it first.
-    
-    # 2. Create Mock Backup Data
+@pytest.fixture(autouse=True)
+def clear_db(test_db):
+    test_db.query(Transaction).delete()
+    test_db.query(Category).delete()
+    test_db.query(Bucket).delete()
+    test_db.query(ImportRowLog).delete()
+    test_db.query(ImportLog).delete()
+    test_db.commit()
+
+def test_importer_creates_bucket_and_updates_balance(test_db):
+    # Create Mock Backup Data
     backup_data = PennyWiseBackup(
         _format="JSON",
         _created="2023-10-27T10:00:00Z",
@@ -36,7 +40,7 @@ def test_importer_income_expense_logic(test_db):
                     id=1,
                     name="Test Category",
                     monthly_amount=Decimal("1000.00"),
-                    total_amount=Decimal("0.00") # Initial amount in backup
+                    total_amount=Decimal("0.00") # Ignored by importer logic for buckets, but used to create category
                 )
             ],
             transactions=[
@@ -60,47 +64,108 @@ def test_importer_income_expense_logic(test_db):
         )
     )
     
-    # 3. Run Importer
+    # Run Importer
     process_backup(backup_data, test_db, "test_backup.json")
     
-    # 4. Verify Results
+    # Verify Results
     cat = test_db.query(Category).filter(Category.name == "Test Category").first()
     assert cat is not None
+    assert cat.bucket is not None
+    
+    bucket = cat.bucket
+    assert bucket.name == "Test Category"
     
     # Expected: 
-    # Initial (from backup category): 0.00
+    # Initial Bucket Amount: 0.00 (Created fresh)
     # + Income: 500.00
     # - Expense: 200.00
     # Total: 300.00
     
-    assert cat.total_amount == Decimal("300.00")
+    assert bucket.total_amount == Decimal("300.00")
 
-def test_importer_existing_category_update(test_db):
-    # Test case where category already exists with some amount
-    cat = Category(name="Existing Cat", total_amount=100)
-    test_db.add(cat)
-    test_db.commit()
-    
-    backup_data = PennyWiseBackup(
+def test_importer_updates_transaction(test_db):
+    # 1. Initial Import
+    backup_data_1 = PennyWiseBackup(
         database=DatabaseSnapshot(
-            categories=[
-                CategoryEntity(name="Existing Cat", total_amount=Decimal("100.00")) 
-                # Importer updates existing category with backup value first (100), then applies transactions
-            ],
+            categories=[CategoryEntity(name="Test Category")],
             transactions=[
                 TransactionEntity(
-                    amount=Decimal("50.00"),
-                    merchant_name="Existing Merchant",
-                    category="Existing Cat",
-                    transaction_type="INCOME",
-                    transaction_hash="tx_income_2"
+                    amount=Decimal("100.00"),
+                    merchant_name="Store",
+                    category="Test Category",
+                    transaction_type="EXPENSE",
+                    transaction_hash="tx_1"
                 )
             ]
         )
     )
+    process_backup(backup_data_1, test_db, "backup1.json")
     
-    process_backup(backup_data, test_db, "test_backup_2.json")
+    cat = test_db.query(Category).filter(Category.name == "Test Category").first()
+    bucket = cat.bucket
+    assert bucket.total_amount == Decimal("-100.00")
     
-    cat = test_db.query(Category).filter(Category.name == "Existing Cat").first()
-    # 100 (initial/backup) + 50 (income) = 150
-    assert cat.total_amount == Decimal("150.00")
+    # 2. Update Import (Change amount to 150)
+    backup_data_2 = PennyWiseBackup(
+        database=DatabaseSnapshot(
+            categories=[CategoryEntity(name="Test Category")],
+            transactions=[
+                TransactionEntity(
+                    amount=Decimal("150.00"), # Changed
+                    merchant_name="Store",
+                    category="Test Category",
+                    transaction_type="EXPENSE",
+                    transaction_hash="tx_1"
+                )
+            ]
+        )
+    )
+    process_backup(backup_data_2, test_db, "backup2.json")
+    
+    test_db.refresh(bucket)
+    # Expected: -100 (reverted) -> 0 -> -150 (applied)
+    # Logic: Revert old (-100 -> +100), Apply new (-150)
+    # Current balance was -100. 
+    # Revert: -100 + 100 = 0.
+    # Apply: 0 - 150 = -150.
+    assert bucket.total_amount == Decimal("-150.00")
+
+def test_importer_soft_delete(test_db):
+    # 1. Initial Import
+    backup_data_1 = PennyWiseBackup(
+        database=DatabaseSnapshot(
+            categories=[CategoryEntity(name="Test Category")],
+            transactions=[
+                TransactionEntity(
+                    amount=Decimal("100.00"),
+                    merchant_name="Store",
+                    category="Test Category",
+                    transaction_type="EXPENSE",
+                    transaction_hash="tx_1"
+                )
+            ]
+        )
+    )
+    process_backup(backup_data_1, test_db, "backup1.json")
+    
+    cat = test_db.query(Category).filter(Category.name == "Test Category").first()
+    bucket = cat.bucket
+    assert bucket.total_amount == Decimal("-100.00")
+    
+    # 2. Delete Import (Transaction removed from backup)
+    backup_data_2 = PennyWiseBackup(
+        database=DatabaseSnapshot(
+            categories=[CategoryEntity(name="Test Category")],
+            transactions=[] # Empty
+        )
+    )
+    process_backup(backup_data_2, test_db, "backup2.json")
+    
+    # Verify Soft Delete
+    tx = test_db.query(Transaction).filter(Transaction.transaction_hash == "tx_1").first()
+    assert tx.is_deleted == True
+    
+    # Verify Balance Revert
+    test_db.refresh(bucket)
+    # Expected: -100 (reverted) -> 0
+    assert bucket.total_amount == Decimal("0.00")

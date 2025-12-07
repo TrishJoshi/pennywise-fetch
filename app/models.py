@@ -29,6 +29,18 @@ class Transaction(Base):
     from_account = Column(String, nullable=True)
     to_account = Column(String, nullable=True)
 
+class Bucket(Base):
+    __tablename__ = "pennywise_buckets"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True)
+    monthly_amount = Column(Numeric(precision=20, scale=2), default=0)
+    total_amount = Column(Numeric(precision=20, scale=2), default=0)
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True), onupdate=datetime.utcnow)
+
+    categories = relationship("Category", back_populates="bucket")
+
 class Category(Base):
     __tablename__ = "pennywise_categories"
 
@@ -40,8 +52,9 @@ class Category(Base):
     display_order = Column(Integer, default=999)
     created_at = Column(DateTime(timezone=True), nullable=True)
     updated_at = Column(DateTime(timezone=True), nullable=True)
-    monthly_amount = Column(Numeric(precision=20, scale=2), default=0)
-    total_amount = Column(Numeric(precision=20, scale=2), default=0)
+    bucket_id = Column(Integer, ForeignKey("pennywise_buckets.id"), nullable=True)
+    
+    bucket = relationship("Bucket", back_populates="categories")
 
 class Card(Base):
     __tablename__ = "pennywise_cards"
@@ -225,8 +238,8 @@ class DistributionLog(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     event_id = Column(Integer, ForeignKey("pennywise_distribution_events.id"), nullable=False)
-    category_id = Column(Integer, ForeignKey("pennywise_categories.id"), nullable=False)
+    bucket_id = Column(Integer, ForeignKey("pennywise_buckets.id"), nullable=False)
     amount = Column(Numeric(precision=20, scale=2), nullable=False)
     
     event = relationship("DistributionEvent", back_populates="logs")
-    category = relationship("Category")
+    bucket = relationship("Bucket")

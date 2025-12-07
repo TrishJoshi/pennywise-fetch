@@ -35,6 +35,15 @@ class TransactionEntity(CamelModel):
     from_account: Optional[str] = None
     to_account: Optional[str] = None
 
+class BucketEntity(CamelModel):
+    id: Optional[int] = None
+    name: Optional[str] = None
+    monthly_amount: Optional[Decimal] = None
+    total_amount: Optional[Decimal] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    categories: List['CategoryEntity'] = []
+
 class CategoryEntity(CamelModel):
     id: Optional[int] = None
     name: Optional[str] = None
@@ -44,8 +53,8 @@ class CategoryEntity(CamelModel):
     display_order: Optional[int] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
-    monthly_amount: Optional[Decimal] = None
-    total_amount: Optional[Decimal] = None
+    updated_at: Optional[datetime] = None
+    bucket_id: Optional[int] = None
 
 class CardEntity(CamelModel):
     id: Optional[int] = None
@@ -64,7 +73,8 @@ class CardEntity(CamelModel):
 
 class DistributionLogEntity(CamelModel):
     id: int
-    category_name: str
+    id: int
+    bucket_name: str
     amount: Decimal
 
 class DistributionEventEntity(CamelModel):
@@ -160,8 +170,8 @@ class BudgetUpdate(BaseModel):
     monthly_amount: str
 
 class FundTransfer(BaseModel):
-    from_category_id: int
-    to_category_id: int
+    from_bucket_id: int
+    to_bucket_id: int
     amount: Optional[str] = None
     transfer_all: bool = False
 

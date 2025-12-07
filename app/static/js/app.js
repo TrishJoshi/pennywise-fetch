@@ -15,8 +15,8 @@ const showNotification = (message, isError = false) => {
 
 // API Calls
 const api = {
-    async getCategories() {
-        const res = await fetch(`${API_BASE}/budget/categories`);
+    async getBuckets() {
+        const res = await fetch(`${API_BASE}/budget/buckets`);
         return res.json();
     },
     async getIncomeTransactions() {
@@ -34,20 +34,27 @@ const api = {
         if (!res.ok) throw new Error((await res.json()).detail);
         return res.json();
     },
-    async resetCategory(id) {
-        const res = await fetch(`${API_BASE}/budget/categories/${id}/reset`, {
+    async resetBucket(id) {
+        const res = await fetch(`${API_BASE}/budget/buckets/${id}/reset`, {
             method: 'POST'
         });
         if (!res.ok) throw new Error((await res.json()).detail);
         return res.json();
     },
-    async updateBudget(id, monthlyAmount) {
-        const res = await fetch(`${API_BASE}/budget/categories/${id}`, {
+    async updateBucketBudget(id, monthlyAmount) {
+        const res = await fetch(`${API_BASE}/budget/buckets/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ monthly_amount: monthlyAmount.toString() })
         });
         if (!res.ok) throw new Error('Failed to update budget');
+        return res.json();
+    },
+    async moveCategory(categoryId, bucketId) {
+        const res = await fetch(`${API_BASE}/budget/categories/${categoryId}/bucket?bucket_id=${bucketId}`, {
+            method: 'PUT'
+        });
+        if (!res.ok) throw new Error('Failed to move category');
         return res.json();
     },
     async distributeIncome(transactionId) {
@@ -64,8 +71,8 @@ const api = {
     },
     async transferFunds(fromId, toId, amount, transferAll) {
         const payload = {
-            from_category_id: parseInt(fromId),
-            to_category_id: parseInt(toId),
+            from_bucket_id: parseInt(fromId),
+            to_bucket_id: parseInt(toId),
             transfer_all: transferAll
         };
         if (!transferAll) payload.amount = amount.toString();
@@ -94,45 +101,58 @@ const api = {
 };
 
 // UI Rendering
-const renderCategories = (categories) => {
+const renderBuckets = (buckets) => {
     const grid = document.getElementById('categories-grid');
     grid.innerHTML = '';
 
     // Populate select options for transfer
     const fromSelect = document.getElementById('transfer-from');
     const toSelect = document.getElementById('transfer-to');
-    const options = categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-    fromSelect.innerHTML = '<option value="">Select Source</option>' + options;
-    toSelect.innerHTML = '<option value="">Select Target</option>' + options;
+    const options = buckets.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+    fromSelect.innerHTML = '<option value="">Select Source Bucket</option>' + options;
+    toSelect.innerHTML = '<option value="">Select Target Bucket</option>' + options;
 
-    categories.forEach(cat => {
+    buckets.forEach(bucket => {
         const card = document.createElement('div');
         card.className = 'card category-card';
 
-        const totalAmount = parseFloat(cat.totalAmount || 0);
+        const totalAmount = parseFloat(bucket.totalAmount || 0);
         const isNegative = totalAmount < 0;
+
+        // Categories List
+        const categoriesList = bucket.categories.map(cat => `
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; padding: 4px 0; border-bottom: 1px solid #eee;">
+                <span>${cat.name}</span>
+                <button class="secondary" style="padding: 2px 6px; font-size: 0.7rem;" onclick="moveCategory(${cat.id})">Move</button>
+            </div>
+        `).join('');
 
         card.innerHTML = `
             <div class="category-header">
                 <div>
-                    <span class="color-dot" style="background-color: ${cat.color || '#fff'}"></span>
-                    <span class="category-name">${cat.name}</span>
+                    <span class="category-name">${bucket.name}</span>
+                    <span style="font-size: 0.8rem; color: var(--text-secondary);">(${bucket.categories.length} categories)</span>
                 </div>
             </div>
             <div class="category-stats">
                 <div class="amount-row">
                     <span class="amount-label">Monthly Budget</span>
-                    <span class="amount-value">${formatCurrency(cat.monthlyAmount || 0)}</span>
+                    <span class="amount-value">${formatCurrency(bucket.monthlyAmount || 0)}</span>
                 </div>
                 <div class="amount-row">
                     <span class="amount-label">Total Available</span>
                     <span class="amount-value" style="color: ${isNegative ? 'var(--error-color)' : 'var(--success-color)'}">${formatCurrency(totalAmount)}</span>
                 </div>
             </div>
+            
+            <div style="margin: 10px 0; max-height: 100px; overflow-y: auto;">
+                ${categoriesList}
+            </div>
+
             <div class="actions">
-                <button class="secondary" onclick="editBudget(${cat.id}, ${cat.monthlyAmount || 0})">Edit Budget</button>
+                <button class="secondary" onclick="editBudget(${bucket.id}, ${bucket.monthlyAmount || 0})">Edit Budget</button>
                 ${isNegative ? `
-                    <button class="secondary" style="background-color: var(--warning-color); color: black;" onclick="resetCategory(${cat.id})">Reset from Others</button>
+                    <button class="secondary" style="background-color: var(--warning-color); color: black;" onclick="resetBucket(${bucket.id})">Reset from Others</button>
                 ` : ''}
             </div>
         `;
@@ -140,7 +160,7 @@ const renderCategories = (categories) => {
     });
 
     // Update Total Balance
-    const totalBalance = categories.reduce((sum, cat) => sum + parseFloat(cat.totalAmount || 0), 0);
+    const totalBalance = buckets.reduce((sum, b) => sum + parseFloat(b.totalAmount || 0), 0);
     document.getElementById('total-balance-amount').textContent = formatCurrency(totalBalance);
 };
 
@@ -209,7 +229,7 @@ const renderDistributionHistory = (events) => {
         details.style.width = '100%';
 
         const logDetails = event.logs.map(log =>
-            `${log.categoryName}: ${formatCurrency(log.amount)}`
+            `${log.bucketName}: ${formatCurrency(log.amount)}`
         ).join(', ');
 
         details.textContent = logDetails;
@@ -233,7 +253,7 @@ window.distributeIncome = async (id) => {
 };
 
 window.revertDistribution = async (id) => {
-    if (!confirm('Are you sure you want to revert this distribution? This will deduct the amounts from categories.')) return;
+    if (!confirm('Are you sure you want to revert this distribution? This will deduct the amounts from buckets.')) return;
     try {
         await api.revertDistribution(id);
         showNotification('Distribution reverted successfully');
@@ -243,11 +263,11 @@ window.revertDistribution = async (id) => {
     }
 };
 
-window.resetCategory = async (id) => {
-    if (!confirm('Reset this category? This will transfer funds from "Others" to make the balance 0.')) return;
+window.resetBucket = async (id) => {
+    if (!confirm('Reset this bucket? This will transfer funds from "Others" to make the balance 0.')) return;
     try {
-        await api.resetCategory(id);
-        showNotification('Category reset successfully');
+        await api.resetBucket(id);
+        showNotification('Bucket reset successfully');
         loadData();
     } catch (e) {
         showNotification(e.message, true);
@@ -258,8 +278,21 @@ window.editBudget = async (id, current) => {
     const newAmount = prompt("Enter new monthly amount:", current);
     if (newAmount !== null && !isNaN(newAmount)) {
         try {
-            await api.updateBudget(id, newAmount);
+            await api.updateBucketBudget(id, newAmount);
             showNotification('Budget updated');
+            loadData();
+        } catch (e) {
+            showNotification(e.message, true);
+        }
+    }
+};
+
+window.moveCategory = async (categoryId) => {
+    const bucketId = prompt("Enter Target Bucket ID:");
+    if (bucketId) {
+        try {
+            await api.moveCategory(categoryId, bucketId);
+            showNotification('Category moved');
             loadData();
         } catch (e) {
             showNotification(e.message, true);
@@ -274,7 +307,7 @@ document.getElementById('transfer-form').onsubmit = async (e) => {
     const amount = document.getElementById('transfer-amount').value;
     const transferAll = document.getElementById('transfer-all').checked;
 
-    if (!from || !to) return showNotification('Select categories', true);
+    if (!from || !to) return showNotification('Select buckets', true);
     if (!transferAll && !amount) return showNotification('Enter amount', true);
 
     try {
@@ -308,12 +341,12 @@ document.getElementById('transfer-all').onchange = (e) => {
 // Init
 const loadData = async () => {
     try {
-        const [cats, txs, dists] = await Promise.all([
-            api.getCategories(),
+        const [buckets, txs, dists] = await Promise.all([
+            api.getBuckets(),
             api.getIncomeTransactions(),
             api.getDistributions()
         ]);
-        renderCategories(cats);
+        renderBuckets(buckets);
         renderIncomeTransactions(txs);
         renderDistributionHistory(dists);
     } catch (e) {

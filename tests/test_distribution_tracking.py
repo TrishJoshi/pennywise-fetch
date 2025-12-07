@@ -6,7 +6,7 @@ from datetime import datetime
 from decimal import Decimal
 from app.main import app
 from app.database import get_db
-from app.models import Category, Transaction, Base, DistributionEvent, DistributionLog
+from app.models import Category, Transaction, Base, DistributionEvent, DistributionLog, Bucket
 
 # Setup Test DB
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test_distribution.db"
@@ -22,10 +22,15 @@ def override_get_db():
     finally:
         db.close()
 
-app.dependency_overrides[get_db] = override_get_db
+@pytest.fixture(autouse=True)
+def override_dependency():
+    app.dependency_overrides[get_db] = override_get_db
+    yield
+    app.dependency_overrides = {}
+
 client = TestClient(app)
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def test_db():
     Base.metadata.create_all(bind=engine)
     db = TestingSessionLocal()
@@ -34,11 +39,11 @@ def test_db():
     Base.metadata.drop_all(bind=engine)
 
 def setup_data(db):
-    # Categories
-    cat1 = Category(name="Food", monthly_amount=1000, total_amount=0)
-    cat2 = Category(name="Rent", monthly_amount=2000, total_amount=0)
-    others = Category(name="Others", monthly_amount=0, total_amount=0)
-    db.add_all([cat1, cat2, others])
+    # Buckets
+    bucket1 = Bucket(name="Food Bucket", monthly_amount=1000, total_amount=0)
+    bucket2 = Bucket(name="Rent Bucket", monthly_amount=2000, total_amount=0)
+    others = Bucket(name="Others", monthly_amount=0, total_amount=0)
+    db.add_all([bucket1, bucket2, others])
     db.commit()
     
     # Income Transaction
@@ -52,6 +57,7 @@ def setup_data(db):
     )
     db.add(tx)
     db.commit()
+    db.refresh(tx)
     return tx
 
 def test_distribution_tracking_and_revert(test_db):
@@ -62,10 +68,10 @@ def test_distribution_tracking_and_revert(test_db):
     assert response.status_code == 200
     
     # Verify Balances
-    cats = client.get("/api/v1/budget/categories").json()
-    food = next(c for c in cats if c["name"] == "Food")
-    rent = next(c for c in cats if c["name"] == "Rent")
-    others = next(c for c in cats if c["name"] == "Others")
+    buckets = client.get("/api/v1/budget/buckets").json()
+    food = next(b for b in buckets if b["name"] == "Food Bucket")
+    rent = next(b for b in buckets if b["name"] == "Rent Bucket")
+    others = next(b for b in buckets if b["name"] == "Others")
     
     assert float(food["totalAmount"]) == 1000.0
     assert float(rent["totalAmount"]) == 2000.0
@@ -87,10 +93,10 @@ def test_distribution_tracking_and_revert(test_db):
     
     # 4. Verify Revert
     # Check Balances (should be 0)
-    cats = client.get("/api/v1/budget/categories").json()
-    food = next(c for c in cats if c["name"] == "Food")
-    rent = next(c for c in cats if c["name"] == "Rent")
-    others = next(c for c in cats if c["name"] == "Others")
+    buckets = client.get("/api/v1/budget/buckets").json()
+    food = next(b for b in buckets if b["name"] == "Food Bucket")
+    rent = next(b for b in buckets if b["name"] == "Rent Bucket")
+    others = next(b for b in buckets if b["name"] == "Others")
     
     assert float(food["totalAmount"]) == 0.0
     assert float(rent["totalAmount"]) == 0.0
@@ -102,10 +108,21 @@ def test_distribution_tracking_and_revert(test_db):
     assert event["isReverted"] is True
 
 def test_revert_already_reverted(test_db):
-    # Get the event from previous test
+    tx = setup_data(test_db)
+    
+    # Distribute
+    response = client.post("/api/v1/budget/distribute", json={"transaction_id": tx.id})
+    assert response.status_code == 200
+    
+    # Get event
     response = client.get("/api/v1/budget/distributions")
     event = response.json()[0]
     
+    # Revert
+    response = client.post(f"/api/v1/budget/distributions/{event['id']}/revert")
+    assert response.status_code == 200
+    
+    # Try to revert again
     response = client.post(f"/api/v1/budget/distributions/{event['id']}/revert")
     assert response.status_code == 400
     assert "already reverted" in response.json()["detail"]

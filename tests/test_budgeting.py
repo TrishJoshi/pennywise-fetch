@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 from app.database import get_db, engine
-from app.models import Category, Transaction, Base
+from app.models import Category, Transaction, Base, Bucket, DistributionLog, DistributionEvent
 from decimal import Decimal
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
@@ -12,24 +12,32 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 
 def override_get_db():
     try:
+        print("OVERRIDE CALLED")
         db = TestingSessionLocal()
         yield db
     finally:
         db.close()
 
-app.dependency_overrides[get_db] = override_get_db
+@pytest.fixture(autouse=True)
+def override_dependency():
+    app.dependency_overrides[get_db] = override_get_db
+    yield
+    app.dependency_overrides = {}
 
 client = TestClient(app)
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def test_db():
     # Create tables
     Base.metadata.create_all(bind=engine)
     db = TestingSessionLocal()
     
     # Clear existing data
+    db.query(DistributionLog).delete()
+    db.query(DistributionEvent).delete()
     db.query(Transaction).delete()
     db.query(Category).delete()
+    db.query(Bucket).delete()
     db.commit()
     
     yield db
@@ -38,11 +46,17 @@ def test_db():
     db.close()
 
 def test_budget_flow(test_db):
-    # 1. Create Categories
-    cat1 = Category(name="Food", monthly_amount=1000, total_amount=0)
-    cat2 = Category(name="Rent", monthly_amount=5000, total_amount=0)
-    others = Category(name="Others", monthly_amount=0, total_amount=0)
-    test_db.add_all([cat1, cat2, others])
+    # 1. Create Buckets and Categories
+    bucket1 = Bucket(name="Food Bucket", monthly_amount=1000, total_amount=0)
+    bucket2 = Bucket(name="Rent Bucket", monthly_amount=5000, total_amount=0)
+    others_bucket = Bucket(name="Others", monthly_amount=0, total_amount=0)
+    
+    test_db.add_all([bucket1, bucket2, others_bucket])
+    test_db.commit()
+    
+    cat1 = Category(name="Food", bucket_id=bucket1.id)
+    cat2 = Category(name="Rent", bucket_id=bucket2.id)
+    test_db.add_all([cat1, cat2])
     test_db.commit()
     
     # 2. Create Income Transaction
@@ -64,53 +78,54 @@ def test_budget_flow(test_db):
     assert data["remainder"] == 4000.0 # 10000 - 6000
     
     # Verify DB updates
-    test_db.refresh(cat1)
-    test_db.refresh(cat2)
-    test_db.refresh(others)
-    assert cat1.total_amount == 1000
-    assert cat2.total_amount == 5000
-    assert others.total_amount == 4000
+    test_db.refresh(bucket1)
+    test_db.refresh(bucket2)
+    test_db.refresh(others_bucket)
+    assert bucket1.total_amount == 1000
+    assert bucket2.total_amount == 5000
+    assert others_bucket.total_amount == 4000
     
     # 4. Transfer Funds
     # Transfer 500 from Others to Food
     response = client.post("/api/v1/budget/transfer", json={
-        "from_category_id": others.id,
-        "to_category_id": cat1.id,
+        "from_bucket_id": others_bucket.id,
+        "to_bucket_id": bucket1.id,
         "amount": "500"
     })
     assert response.status_code == 200
     
-    test_db.refresh(cat1)
-    test_db.refresh(others)
-    assert cat1.total_amount == 1500
-    assert others.total_amount == 3500
+    test_db.refresh(bucket1)
+    test_db.refresh(others_bucket)
+    assert bucket1.total_amount == 1500
+    assert others_bucket.total_amount == 3500
     
     # 5. Transfer All
     # Transfer all remaining Others to Rent
     response = client.post("/api/v1/budget/transfer", json={
-        "from_category_id": others.id,
-        "to_category_id": cat2.id,
+        "from_bucket_id": others_bucket.id,
+        "to_bucket_id": bucket2.id,
         "transfer_all": True
     })
     assert response.status_code == 200
     
-    test_db.refresh(cat2)
-    test_db.refresh(others)
-    assert cat2.total_amount == 8500 # 5000 + 3500
-    assert others.total_amount == 0
+    test_db.refresh(bucket2)
+    test_db.refresh(others_bucket)
+    assert bucket2.total_amount == 8500 # 5000 + 3500
+    assert others_bucket.total_amount == 0
 
     # 6. Insufficient Funds Test
     response = client.post("/api/v1/budget/transfer", json={
-        "from_category_id": others.id,
-        "to_category_id": cat1.id,
+        "from_bucket_id": others_bucket.id,
+        "to_bucket_id": bucket1.id,
         "amount": "100"
     })
     assert response.status_code == 400
 
 def test_insufficient_funds_message(test_db):
-    # Create categories
-    cat = Category(name="Luxury", monthly_amount=1000, total_amount=0)
-    test_db.add(cat)
+    # Create bucket
+    bucket = Bucket(name="Luxury Bucket", monthly_amount=1000, total_amount=0)
+    others = Bucket(name="Others", monthly_amount=0, total_amount=0) # Needed for distribute logic
+    test_db.add_all([bucket, others])
     test_db.commit()
     
     # Create Income with insufficient amount
@@ -128,7 +143,7 @@ def test_insufficient_funds_message(test_db):
     response = client.post("/api/v1/budget/distribute", json={"transaction_id": income_tx.id})
     assert response.status_code == 400
     assert "Insufficient funds" in response.json()["detail"]
-    assert "Needed: 7000.00" in response.json()["detail"]
+    assert "Needed: 1000.00" in response.json()["detail"]
     assert "Available: 500.00" in response.json()["detail"]
 
 def test_get_income_transactions(test_db):
@@ -151,8 +166,14 @@ def test_get_income_transactions(test_db):
     merchants = [t["merchantName"] for t in data]
     assert "Bonus" in merchants
 
-def test_get_categories_no_500(test_db):
-    response = client.get("/api/v1/budget/categories")
+def test_get_buckets(test_db):
+    bucket = Bucket(name="Food Bucket", monthly_amount=1000, total_amount=0)
+    test_db.add(bucket)
+    test_db.commit()
+
+    response = client.get("/api/v1/budget/buckets")
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, list)
+    names = [b["name"] for b in data]
+    assert "Food Bucket" in names

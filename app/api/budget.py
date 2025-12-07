@@ -1,20 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import Category, Transaction
-from app.schemas import CategoryEntity, BudgetUpdate, FundTransfer, DistributeIncomeRequest, TransactionEntity
-from decimal import Decimal
-from typing import List
-from sqlalchemy import desc
-from app.models import Category, Transaction, DistributionEvent, DistributionLog
+from app.models import Category, Transaction, Bucket, DistributionEvent, DistributionLog
 from app.schemas import (
     CategoryEntity, 
     BudgetUpdate, 
     FundTransfer, 
     DistributeIncomeRequest, 
     TransactionEntity,
-    DistributionEventEntity
+    DistributionEventEntity,
+    BucketEntity
 )
+from decimal import Decimal
+from typing import List
+from sqlalchemy import desc
 
 router = APIRouter(
     prefix="/budget",
@@ -22,9 +21,10 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
-@router.get("/categories", response_model=List[CategoryEntity])
-def get_categories(db: Session = Depends(get_db)):
-    return db.query(Category).order_by(Category.display_order).all()
+@router.get("/buckets", response_model=List[BucketEntity])
+def get_buckets(db: Session = Depends(get_db)):
+    # Return all buckets with nested categories
+    return db.query(Bucket).order_by(Bucket.name).all()
 
 @router.get("/income-transactions", response_model=List[TransactionEntity])
 def get_income_transactions(db: Session = Depends(get_db)):
@@ -44,7 +44,7 @@ def get_distributions(db: Session = Depends(get_db)):
         for log in event.logs:
             logs.append({
                 "id": log.id,
-                "categoryName": log.category.name,
+                "bucketName": log.bucket.name if log.bucket else "Unknown",
                 "amount": log.amount
             })
         result.append({
@@ -57,16 +57,30 @@ def get_distributions(db: Session = Depends(get_db)):
         })
     return result
 
-@router.put("/categories/{category_id}", response_model=CategoryEntity)
-def update_category_budget(category_id: int, budget: BudgetUpdate, db: Session = Depends(get_db)):
+@router.put("/buckets/{bucket_id}", response_model=BucketEntity)
+def update_bucket_budget(bucket_id: int, budget: BudgetUpdate, db: Session = Depends(get_db)):
+    bucket = db.query(Bucket).filter(Bucket.id == bucket_id).first()
+    if not bucket:
+        raise HTTPException(status_code=404, detail="Bucket not found")
+    
+    bucket.monthly_amount = Decimal(budget.monthly_amount)
+    db.commit()
+    db.refresh(bucket)
+    return bucket
+
+@router.put("/categories/{category_id}/bucket")
+def move_category_to_bucket(category_id: int, bucket_id: int, db: Session = Depends(get_db)):
     category = db.query(Category).filter(Category.id == category_id).first()
     if not category:
         raise HTTPException(status_code=404, detail="Category not found")
     
-    category.monthly_amount = Decimal(budget.monthly_amount)
+    bucket = db.query(Bucket).filter(Bucket.id == bucket_id).first()
+    if not bucket:
+        raise HTTPException(status_code=404, detail="Target bucket not found")
+        
+    category.bucket_id = bucket.id
     db.commit()
-    db.refresh(category)
-    return category
+    return {"message": "Category moved successfully"}
 
 @router.post("/distribute")
 def distribute_income(request: DistributeIncomeRequest, db: Session = Depends(get_db)):
@@ -77,17 +91,17 @@ def distribute_income(request: DistributeIncomeRequest, db: Session = Depends(ge
     if transaction.category != "Income" or transaction.transaction_type != "INCOME":
         raise HTTPException(status_code=400, detail="Transaction must be of category 'Income' and type 'INCOME'")
     
-    categories = db.query(Category).all()
-    others_category = next((c for c in categories if c.name == "Others"), None)
+    buckets = db.query(Bucket).all()
+    others_bucket = next((b for b in buckets if b.name == "Others"), None)
     
-    if not others_category:
-        # Create Others category if it doesn't exist
-        others_category = Category(name="Others", is_system=True, is_income=False)
-        db.add(others_category)
+    if not others_bucket:
+        # Create Others bucket if it doesn't exist
+        others_bucket = Bucket(name="Others")
+        db.add(others_bucket)
         db.flush()
-        categories.append(others_category)
+        buckets.append(others_bucket)
 
-    total_needed = sum((c.monthly_amount or Decimal(0)) for c in categories if c.name != "Others")
+    total_needed = sum((b.monthly_amount or Decimal(0)) for b in buckets if b.name != "Others")
     
     if transaction.amount < total_needed:
         raise HTTPException(status_code=400, detail=f"Insufficient funds. Needed: {total_needed}, Available: {transaction.amount}")
@@ -102,28 +116,28 @@ def distribute_income(request: DistributeIncomeRequest, db: Session = Depends(ge
         db.flush() # Get ID
 
         sum_allocated = Decimal(0)
-        for category in categories:
-            if category.name != "Others":
-                monthly_amt = category.monthly_amount or Decimal(0)
-                category.total_amount = (category.total_amount or 0) + monthly_amt
+        for bucket in buckets:
+            if bucket.name != "Others":
+                monthly_amt = bucket.monthly_amount or Decimal(0)
+                bucket.total_amount = (bucket.total_amount or 0) + monthly_amt
                 sum_allocated += monthly_amt
                 
                 # Log entry
                 if monthly_amt > 0:
                     db.add(DistributionLog(
                         event_id=event.id,
-                        category_id=category.id,
+                        bucket_id=bucket.id,
                         amount=monthly_amt
                     ))
         
         remainder = transaction.amount - sum_allocated
-        others_category.total_amount = (others_category.total_amount or 0) + remainder
+        others_bucket.total_amount = (others_bucket.total_amount or 0) + remainder
         
         # Log remainder
         if remainder > 0:
             db.add(DistributionLog(
                 event_id=event.id,
-                category_id=others_category.id,
+                bucket_id=others_bucket.id,
                 amount=remainder
             ))
         
@@ -136,56 +150,56 @@ def distribute_income(request: DistributeIncomeRequest, db: Session = Depends(ge
 
 @router.post("/transfer")
 def transfer_funds(transfer: FundTransfer, db: Session = Depends(get_db)):
-    from_category = db.query(Category).filter(Category.id == transfer.from_category_id).first()
-    to_category = db.query(Category).filter(Category.id == transfer.to_category_id).first()
+    from_bucket = db.query(Bucket).filter(Bucket.id == transfer.from_bucket_id).first()
+    to_bucket = db.query(Bucket).filter(Bucket.id == transfer.to_bucket_id).first()
     
-    if not from_category or not to_category:
-        raise HTTPException(status_code=404, detail="One or both categories not found")
+    if not from_bucket or not to_bucket:
+        raise HTTPException(status_code=404, detail="One or both buckets not found")
     
     amount_to_transfer = Decimal(0)
     
     if transfer.transfer_all:
-        amount_to_transfer = from_category.total_amount
+        amount_to_transfer = from_bucket.total_amount
     elif transfer.amount:
         amount_to_transfer = Decimal(transfer.amount)
     else:
         raise HTTPException(status_code=400, detail="Amount must be provided if transfer_all is False")
         
-    if (from_category.total_amount or 0) < amount_to_transfer:
-        raise HTTPException(status_code=400, detail="Insufficient funds in source category")
+    if (from_bucket.total_amount or 0) < amount_to_transfer:
+        raise HTTPException(status_code=400, detail="Insufficient funds in source bucket")
     
     try:
-        from_category.total_amount = (from_category.total_amount or 0) - amount_to_transfer
-        to_category.total_amount = (to_category.total_amount or 0) + amount_to_transfer
+        from_bucket.total_amount = (from_bucket.total_amount or 0) - amount_to_transfer
+        to_bucket.total_amount = (to_bucket.total_amount or 0) + amount_to_transfer
         db.commit()
         return {"message": "Funds transferred successfully", "amount": float(amount_to_transfer)}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/categories/{category_id}/reset")
-def reset_category(category_id: int, db: Session = Depends(get_db)):
-    category = db.query(Category).filter(Category.id == category_id).first()
-    if not category:
-        raise HTTPException(status_code=404, detail="Category not found")
+@router.post("/buckets/{bucket_id}/reset")
+def reset_bucket(bucket_id: int, db: Session = Depends(get_db)):
+    bucket = db.query(Bucket).filter(Bucket.id == bucket_id).first()
+    if not bucket:
+        raise HTTPException(status_code=404, detail="Bucket not found")
     
-    if (category.total_amount or 0) >= 0:
-        raise HTTPException(status_code=400, detail="Category balance is not negative")
+    if (bucket.total_amount or 0) >= 0:
+        raise HTTPException(status_code=400, detail="Bucket balance is not negative")
         
-    others = db.query(Category).filter(Category.name == "Others").first()
+    others = db.query(Bucket).filter(Bucket.name == "Others").first()
     if not others:
-        raise HTTPException(status_code=500, detail="Others category not found")
+        raise HTTPException(status_code=500, detail="Others bucket not found")
         
-    amount_needed = abs(category.total_amount)
+    amount_needed = abs(bucket.total_amount)
     
     if (others.total_amount or 0) < amount_needed:
         raise HTTPException(status_code=400, detail=f"Insufficient funds in Others. Needed: {amount_needed}, Available: {others.total_amount}")
         
     try:
         others.total_amount -= amount_needed
-        category.total_amount += amount_needed
+        bucket.total_amount += amount_needed
         db.commit()
-        return {"message": "Category reset successfully", "transferred_amount": float(amount_needed)}
+        return {"message": "Bucket reset successfully", "transferred_amount": float(amount_needed)}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -202,9 +216,9 @@ def revert_distribution(event_id: int, db: Session = Depends(get_db)):
     try:
         # Revert balances
         for log in event.logs:
-            category = db.query(Category).filter(Category.id == log.category_id).first()
-            if category:
-                category.total_amount = (category.total_amount or 0) - log.amount
+            bucket = db.query(Bucket).filter(Bucket.id == log.bucket_id).first()
+            if bucket:
+                bucket.total_amount = (bucket.total_amount or 0) - log.amount
         
         event.is_reverted = True
         db.commit()
