@@ -311,15 +311,37 @@ window.editBudget = async (id, current) => {
 };
 
 window.moveCategory = (categoryId) => {
-    currentMovingCategoryId = categoryId;
-    const modal = document.getElementById('move-category-modal');
-    const select = document.getElementById('move-category-select');
+    console.log('moveCategory called with ID:', categoryId);
+    try {
+        currentMovingCategoryId = categoryId;
+        const modal = document.getElementById('move-category-modal');
+        if (!modal) {
+            console.error('Modal element not found');
+            alert('Error: Modal element not found');
+            return;
+        }
 
-    // Populate select
-    select.innerHTML = '<option value="">Select Target Bucket</option>' +
-        currentBuckets.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+        const select = document.getElementById('move-category-select');
+        if (!select) {
+            console.error('Select element not found');
+            alert('Error: Select element not found');
+            return;
+        }
 
-    modal.classList.remove('hidden');
+        if (!currentBuckets || !Array.isArray(currentBuckets)) {
+            console.error('currentBuckets is invalid:', currentBuckets);
+            currentBuckets = [];
+        }
+
+        const options = currentBuckets.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+        select.innerHTML = '<option value="">Select Target Bucket</option>' + options;
+
+        modal.classList.remove('hidden');
+        console.log('Modal opened');
+    } catch (e) {
+        console.error('Error in moveCategory:', e);
+        alert('Error: ' + e.message);
+    }
 };
 
 window.closeMoveCategoryModal = () => {
