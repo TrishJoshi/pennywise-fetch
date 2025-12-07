@@ -78,6 +78,21 @@
         </div>
     </div>
 
+    <div id="move-category-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>Move Category</h3>
+            <p style="color: var(--text-secondary); margin-bottom: 15px;">Select the target bucket for this category.
+            </p>
+            <select id="move-category-select">
+                <option value="">Select Target Bucket</option>
+            </select>
+            <div class="modal-actions">
+                <button class="secondary" onclick="closeMoveCategoryModal()">Cancel</button>
+                <button onclick="confirmMoveCategory()">Move</button>
+            </div>
+        </div>
+    </div>
+
     <div id="notification"></div>
     <script src="/static/js/app.js"></script>
 </body>

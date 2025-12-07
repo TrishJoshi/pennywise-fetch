@@ -1,4 +1,6 @@
 const API_BASE = '/api/v1';
+let currentBuckets = [];
+let currentMovingCategoryId = null;
 
 // Utilities
 const formatCurrency = (amount) => {
@@ -37,6 +39,13 @@ const api = {
     async resetBucket(id) {
         const res = await fetch(`${API_BASE}/budget/buckets/${id}/reset`, {
             method: 'POST'
+        });
+        if (!res.ok) throw new Error((await res.json()).detail);
+        return res.json();
+    },
+    async deleteBucket(id) {
+        const res = await fetch(`${API_BASE}/budget/buckets/${id}`, {
+            method: 'DELETE'
         });
         if (!res.ok) throw new Error((await res.json()).detail);
         return res.json();
@@ -153,6 +162,9 @@ const renderBuckets = (buckets) => {
                 <button class="secondary" onclick="editBudget(${bucket.id}, ${bucket.monthlyAmount || 0})">Edit Budget</button>
                 ${isNegative ? `
                     <button class="secondary" style="background-color: var(--warning-color); color: black;" onclick="resetBucket(${bucket.id})">Reset from Others</button>
+                ` : ''}
+                ${bucket.categories.length === 0 ? `
+                    <button class="secondary" style="border-color: var(--error-color); color: var(--error-color);" onclick="deleteBucket(${bucket.id})">Delete</button>
                 ` : ''}
             </div>
         `;
@@ -274,6 +286,17 @@ window.resetBucket = async (id) => {
     }
 };
 
+window.deleteBucket = async (id) => {
+    if (!confirm('Are you sure you want to delete this bucket?')) return;
+    try {
+        await api.deleteBucket(id);
+        showNotification('Bucket deleted successfully');
+        loadData();
+    } catch (e) {
+        showNotification(e.message, true);
+    }
+};
+
 window.editBudget = async (id, current) => {
     const newAmount = prompt("Enter new monthly amount:", current);
     if (newAmount !== null && !isNaN(newAmount)) {
@@ -287,16 +310,39 @@ window.editBudget = async (id, current) => {
     }
 };
 
-window.moveCategory = async (categoryId) => {
-    const bucketId = prompt("Enter Target Bucket ID:");
-    if (bucketId) {
-        try {
-            await api.moveCategory(categoryId, bucketId);
-            showNotification('Category moved');
-            loadData();
-        } catch (e) {
-            showNotification(e.message, true);
-        }
+window.moveCategory = (categoryId) => {
+    currentMovingCategoryId = categoryId;
+    const modal = document.getElementById('move-category-modal');
+    const select = document.getElementById('move-category-select');
+
+    // Populate select
+    select.innerHTML = '<option value="">Select Target Bucket</option>' +
+        currentBuckets.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+
+    modal.classList.remove('hidden');
+};
+
+window.closeMoveCategoryModal = () => {
+    document.getElementById('move-category-modal').classList.add('hidden');
+    currentMovingCategoryId = null;
+};
+
+window.confirmMoveCategory = async () => {
+    const select = document.getElementById('move-category-select');
+    const bucketId = select.value;
+
+    if (!bucketId) {
+        showNotification('Please select a target bucket', true);
+        return;
+    }
+
+    try {
+        await api.moveCategory(currentMovingCategoryId, bucketId);
+        showNotification('Category moved');
+        closeMoveCategoryModal();
+        loadData();
+    } catch (e) {
+        showNotification(e.message, true);
     }
 };
 
@@ -346,6 +392,7 @@ const loadData = async () => {
             api.getIncomeTransactions(),
             api.getDistributions()
         ]);
+        currentBuckets = buckets;
         renderBuckets(buckets);
         renderIncomeTransactions(txs);
         renderDistributionHistory(dists);

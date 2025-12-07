@@ -68,6 +68,23 @@ def update_bucket_budget(bucket_id: int, budget: BudgetUpdate, db: Session = Dep
     db.refresh(bucket)
     return bucket
 
+@router.delete("/buckets/{bucket_id}")
+def delete_bucket(bucket_id: int, db: Session = Depends(get_db)):
+    bucket = db.query(Bucket).filter(Bucket.id == bucket_id).first()
+    if not bucket:
+        raise HTTPException(status_code=404, detail="Bucket not found")
+    
+    if bucket.categories:
+        raise HTTPException(status_code=400, detail="Cannot delete bucket with associated categories. Move categories first.")
+        
+    try:
+        db.delete(bucket)
+        db.commit()
+        return {"message": "Bucket deleted successfully"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.put("/categories/{category_id}/bucket")
 def move_category_to_bucket(category_id: int, bucket_id: int, db: Session = Depends(get_db)):
     category = db.query(Category).filter(Category.id == category_id).first()
