@@ -163,7 +163,7 @@ const renderBuckets = (buckets) => {
                 ${isNegative ? `
                     <button class="secondary" style="background-color: var(--warning-color); color: black;" onclick="resetBucket(${bucket.id})">Reset from Others</button>
                 ` : ''}
-                ${bucket.categories.length === 0 ? `
+                ${bucket.categories.length === 0 && totalAmount === 0 ? `
                     <button class="secondary" style="border-color: var(--error-color); color: var(--error-color);" onclick="deleteBucket(${bucket.id})">Delete</button>
                 ` : ''}
             </div>

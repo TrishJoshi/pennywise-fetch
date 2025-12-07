@@ -77,6 +77,9 @@ def delete_bucket(bucket_id: int, db: Session = Depends(get_db)):
     if bucket.categories:
         raise HTTPException(status_code=400, detail="Cannot delete bucket with associated categories. Move categories first.")
         
+    if bucket.total_amount != 0:
+        raise HTTPException(status_code=400, detail="Cannot delete bucket with non-zero balance. Transfer funds first.")
+
     try:
         db.delete(bucket)
         db.commit()
